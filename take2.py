@@ -76,9 +76,10 @@ class ROIDrawer:
 
 
 class Preprocessor:
-    def __init__(self):
+    def __init__(self, stationary_memory=None):
         self.fgbg = cv2.createBackgroundSubtractorMOG2(varThreshold=50, detectShadows=False)
-        
+        self.stationary_memory = stationary_memory or {}
+
     def preprocess(self, frame):
         # Convert to grayscale if it's a color image
         if len(frame.shape) == 3:
@@ -97,9 +98,11 @@ class Preprocessor:
         # # Morphological Closing
         # kernel = np.ones((5, 5), np.uint8)
         # closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
-        
-        return thresh
-    
+
+        for pos, val in self.stationary_memory.items():
+            fgmask[pos] = val
+        return fgmask
+            
 
 
 
@@ -227,6 +230,12 @@ class MosquitoTracker:
         for x, y, _ in detected_mosquitoes:
             self._update_tracklet(x, y)
             detected_ids.add((x, y))
+            pos = (x, y)
+            self.stationary_memory[pos] = self.stationary_memory.get(pos, 0) + 1
+
+        for pos in list(self.stationary_memory.keys()):
+            if pos not in detected_mosquitoes:
+                del self.stationary_memory[pos]
 
         additional_detections = self._check_stationary_memory(detected_mosquitoes)
         detected_mosquitoes.extend(additional_detections)
@@ -338,8 +347,11 @@ class Visualization:
         for cx, cy, r in rois:
             self.draw_circle(frame, (cx, cy), r, (255, 255, 255))
 
-        # for x, y, _ in detected_mosquitoes:
-        #     self.draw_circle(frame, (x, y), 5, (255, 51, 153))
+        # Draw detected but not tracked mosquitoes
+        tracked_positions = set(tracklet['position'] for tracklet in tracklets.values())
+        for x, y, _ in detected_mosquitoes:
+            if (x, y) not in tracked_positions:
+                self.draw_circle(frame, (x, y), 5, (255, 51, 153))
 
         # Draw tracked mosquitoes
         for id, tracklet in tracklets.items():
@@ -354,13 +366,25 @@ class Visualization:
         cv2.waitKey(1)
 
 
+    def display_side_by_side(self, original_frame, processed_frame):
+    # Convert processed frame to 3-channel image to match original_frame
+        processed_frame_colored = cv2.cvtColor(processed_frame, cv2.COLOR_GRAY2BGR)
+        
+        # Concatenate frames horizontally
+        concatenated_frame = cv2.hconcat([original_frame, processed_frame_colored])
+        
+        # Display the concatenated frame
+        cv2.imshow('Original vs Processed', concatenated_frame)
+        cv2.waitKey(1)
+
+
+
 
 
 def main(video_path, csv_file_path):
     # Initialize classes
     video_reader = VideoReader(video_path)
     roi_drawer = ROIDrawer()
-    preprocessor = Preprocessor()
     # data_logger = DataLogger(csv_file_path, roi_drawer.get_rois())
     visualization = Visualization()
 
@@ -371,6 +395,8 @@ def main(video_path, csv_file_path):
     mosquito_detector = MosquitoDetector(rois)
     mosquito_tracker = MosquitoTracker()
     data_analysis = DataAnalysis(csv_file_path, rois)
+    preprocessor = Preprocessor(stationary_memory=mosquito_tracker.stationary_memory)
+
 
     frame_number = 0
     while True:
@@ -394,12 +420,13 @@ def main(video_path, csv_file_path):
 
         # Log data
         data_analysis.log_data(frame_number, tracklets)
-        logging.info(mosquito_tracker.__dict__)
+        # logging.info(mosquito_tracker.__dict__)
 
 
         # Overlay tracking data on the frame
         visualization.overlay_data(frame, tracklets, detected_mosquitoes, rois)
-
+        visualization.display_side_by_side(frame, preprocessed_frame)
+        
         frame_number += 1
 
     # Export tracking data to CSV
