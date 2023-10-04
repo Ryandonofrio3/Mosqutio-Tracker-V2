@@ -379,6 +379,43 @@ class DataAnalysis:
 
 
 
+# class Visualization:
+#     def __init__(self):
+#         pass
+
+#     def draw_circle(self, frame, center, radius, color, thickness=2):
+#         cv2.circle(frame, center, radius, color, thickness)
+
+#     def overlay_detected(self, frame, detected_mosquitoes, rois):
+#         # Draw ROIs and detected mosquitoes
+#         for cx, cy, r in rois:
+#             self.draw_circle(frame, (cx, cy), r, (255, 255, 255))
+#         for x, y, _ in detected_mosquitoes:
+#             self.draw_circle(frame, (x, y), 5, (255, 51, 153))
+            
+#     def overlay_tracked(self, frame, tracklets, rois):
+#         # Draw ROIs and tracked mosquitoes
+#         for cx, cy, r in rois:
+#             self.draw_circle(frame, (cx, cy), r, (255, 255, 255))
+#         for id, tracklet in tracklets.items():
+#             x, y = tracklet['position']
+#             if tracklet['state'] == 'moving':
+#                 self.draw_circle(frame, (x, y), 5, (0, 255, 0))
+#             elif tracklet['state'] == 'feeding':
+#                 self.draw_circle(frame, (x, y), 5, (0, 0, 255))
+
+
+#     def display_side_by_side(self, original_frame, processed_frame):
+#     # Convert processed frame to 3-channel image to match original_frame
+#         processed_frame_colored = cv2.cvtColor(processed_frame, cv2.COLOR_GRAY2BGR)
+        
+#         # Concatenate frames horizontally
+#         concatenated_frame = cv2.hconcat([original_frame, processed_frame_colored])
+        
+#         # Display the concatenated frame
+#         cv2.imshow('Original vs Processed', concatenated_frame)
+#         cv2.waitKey(1)
+
 class Visualization:
     def __init__(self):
         pass
@@ -386,23 +423,19 @@ class Visualization:
     def draw_circle(self, frame, center, radius, color, thickness=2):
         cv2.circle(frame, center, radius, color, thickness)
 
-    def overlay_detected(self, frame, detected_mosquitoes, rois):
-        # Draw ROIs and detected mosquitoes
+    def overlay_data(self, frame, detected_mosquitoes, rois):
+        # Draw ROIs
         for cx, cy, r in rois:
             self.draw_circle(frame, (cx, cy), r, (255, 255, 255))
+
+        # Draw detected but not tracked mosquitoes
         for x, y, _ in detected_mosquitoes:
             self.draw_circle(frame, (x, y), 5, (255, 51, 153))
-            
-    def overlay_tracked(self, frame, tracklets, rois):
-        # Draw ROIs and tracked mosquitoes
-        for cx, cy, r in rois:
-            self.draw_circle(frame, (cx, cy), r, (255, 255, 255))
-        for id, tracklet in tracklets.items():
-            x, y = tracklet['position']
-            if tracklet['state'] == 'moving':
-                self.draw_circle(frame, (x, y), 5, (0, 255, 0))
-            elif tracklet['state'] == 'feeding':
-                self.draw_circle(frame, (x, y), 5, (0, 0, 255))
+
+        # Display the frame
+        cv2.imshow('Mosquito Detection', frame)
+        cv2.waitKey(1)
+
 
 
     def display_side_by_side(self, original_frame, processed_frame):
@@ -471,16 +504,18 @@ def main(video_path, csv_file_path):
         data_analysis.log_data(frame_number, tracklets)
         # logging.info(mosquito_tracker.__dict__)
 
-        frame_for_detected = frame.copy()
-        frame_for_tracked = frame.copy()
+        # frame_for_detected = frame.copy()
+        # frame_for_tracked = frame.copy()
         
         # Overlay tracking and detection data on separate frames
-        visualization.overlay_detected(frame_for_detected, detected_mosquitoes, rois)
-        visualization.overlay_tracked(frame_for_tracked, tracklets, rois)
-        
-        # Display the frames side by side
-        concatenated_frame = cv2.hconcat([frame_for_detected, frame_for_tracked])
-        cv2.imshow('Detected vs Tracked', concatenated_frame)
+
+       
+
+        # Overlay tracking data on the frame
+        visualization.overlay_data(frame, detected_mosquitoes, rois)
+        visualization.display_side_by_side(frame, preprocessed_frame)
+
+        cv2.imshow('Computer Vision vs Detected', frame)
         cv2.waitKey(1)
         
         frame_number += 1
